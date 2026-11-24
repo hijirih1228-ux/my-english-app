@@ -1,0 +1,299 @@
+
+
+<!DOCTYPE html>
+
+<html lang="ja">
+
+<head>
+
+<meta charset="UTF-8">
+
+<meta name="viewport" content="width=device-width, initial-scale=1">
+
+<title>My English</title>
+
+<style>
+
+*{box-sizing:border-box}
+
+body{margin:0;background:#f6f7f9;color:#172033;font-family:-apple-system,BlinkMacSystemFont,sans-serif}
+
+main{max-width:600px;margin:auto;padding:24px}
+
+h1{font-size:32px;letter-spacing:-1px}
+
+small{color:#788395}
+
+.card{background:white;border:1px solid #e5e7eb;border-radius:24px;padding:24px;margin:20px 0}
+
+button,select{font:inherit;border:1px solid #ddd;border-radius:14px;padding:14px;background:white;color:#172033}
+
+button{cursor:pointer}
+
+select{width:100%}
+
+.primary{background:#172033;color:white;width:100%;border:0}
+
+.actions{display:flex;gap:8px;margin-top:16px}
+
+.actions button{flex:1}
+
+#english{font-size:27px;font-weight:700;line-height:1.5}
+
+#japanese,#katakana,#note{line-height:1.8}
+
+#katakana,#note{color:#778195;font-size:14px}
+
+nav{display:flex;gap:8px}
+
+nav button{flex:1}
+
+</style>
+
+</head>
+
+<body>
+
+<main>
+
+<small>YOUR PERSONAL ENGLISH COACH</small>
+
+<h1>My English.</h1>
+
+<p>毎日少しずつ、話せる英語へ。</p>
+
+<nav>
+
+<button onclick="mode(false)">レッスン</button>
+
+<button onclick="mode(true)">復習 ★</button>
+
+</nav>
+
+<div class="card">
+
+<select id="category" onchange="filter()">
+
+<option value="">すべての場面</option>
+
+</select>
+
+</div>
+
+<small id="progress">読み込み中...</small>
+
+<div class="card">
+
+<small id="situation"></small>
+
+<p id="english"></p>
+
+<button class="primary" onclick="speak()">▶ 英語を聞く</button>
+
+<div class="actions">
+
+<button onclick="speak(0.65)">ゆっくり再生</button>
+
+<button onclick="save()">★ 保存</button>
+
+</div>
+
+<p id="japanese"></p>
+
+<p id="katakana"></p>
+
+<p id="note"></p>
+
+<div class="actions">
+
+<button onclick="move(-1)">← 前へ</button>
+
+<button onclick="move(1)">次へ →</button>
+
+</div>
+
+</div>
+
+<p id="status"></p>
+
+</main>
+
+<script>
+
+let all=[],items=[],i=0,review=false;
+
+let favorites=[];
+
+try{
+
+favorites=JSON.parse(localStorage.getItem('favorites')||'[]');
+
+}catch(e){}
+
+const $=id=>document.getElementById(id);
+
+function parse(t){
+
+let rows=[],row=[],v='',q=false;
+
+for(let j=0;j<t.length;j++){
+
+let c=t[j];
+
+if(c==='"'){
+
+if(q&&t[j+1]==='"'){v+='"';j++}
+
+else q=!q;
+
+}else if(c===','&&!q){
+
+row.push(v);v='';
+
+}else if(c==='\n'&&!q){
+
+row.push(v);rows.push(row);row=[];v='';
+
+}else if(c!=='\r'){v+=c}
+
+}
+
+if(v||row.length){row.push(v);rows.push(row)}
+
+return rows;
+
+}
+
+async function load(){
+
+try{
+
+let r=await fetch('./phrases.csv');
+
+if(!r.ok)throw Error();
+
+let rows=parse(await r.text());
+
+all=rows.slice(1).filter(r=>r.length>=5);
+
+[...new Set(all.map(r=>r[0]))].forEach(c=>{
+
+let o=document.createElement('option');
+
+o.value=c;o.textContent=c;
+
+$('category').appendChild(o);
+
+});
+
+filter();
+
+}catch(e){
+
+$('progress').textContent='読み込みエラー';
+
+$('status').textContent='phrases.csvの保存場所を確認してください。';
+
+}
+
+}
+
+function filter(){
+
+items=all.filter(r=>
+
+(!$('category').value||r[0]===$('category').value)
+
+&&(!review||favorites.includes(r[2])));
+
+i=0;show();
+
+}
+
+function mode(v){
+
+review=v; $('category').value='';filter();
+
+}
+
+function show(){
+
+let r=items[i];
+
+$('progress').textContent=r?(i+1)+' / '+items.length:'フレーズがありません';
+
+$('situation').textContent=r?r[0]+' / '+r[1]:'';
+
+$('english').textContent=r?r[2]:'';
+
+$('japanese').textContent=r?r[3]:'';
+
+$('katakana').textContent=r?r[4]:'';
+
+$('note').textContent=r?r.slice(5).join(' / '):'';
+
+$('status').textContent=r&&favorites.includes(r[2])?'★ 保存済み':'';
+
+}
+
+function move(n){
+
+if(!items.length)return;
+
+i=(i+n+items.length)%items.length;
+
+show();
+
+}
+
+function speak(rate=0.9){
+
+if(!items[i])return;
+
+if(!('speechSynthesis' in window)){
+
+$('status').textContent='音声再生に対応していません';
+
+return;
+
+}
+
+speechSynthesis.cancel();
+
+let u=new SpeechSynthesisUtterance(items[i][2]);
+
+u.lang='en-US';u.rate=rate;
+
+speechSynthesis.speak(u);
+
+}
+
+function save(){
+
+if(!items[i])return;
+
+let s=items[i][2];
+
+if(!favorites.includes(s))favorites.push(s);
+
+try{
+
+localStorage.setItem('favorites',JSON.stringify(favorites));
+
+$('status').textContent='★ 復習リストに保存しました';
+
+}catch(e){
+
+$('status').textContent='端末への保存ができませんでした';
+
+}
+
+}
+
+load();
+
+</script>
+
+</body>
+
+</html>
